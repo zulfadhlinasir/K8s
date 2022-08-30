@@ -1,0 +1,39 @@
+K8S has multiple certificates generated while installation to communicate each of the components securely like scheduler, front-proxy-client, etcd-server, api-server etc.
+when we run kubelet command, it directly requests to 8443 api-server over TLS, however, if the certificate expired, then no longer able to run kubelet command and broken your k8s cluster. 
+
+To renew your certificate, you can follow below steps:
+https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/
+https://docs.nginx.com/nginx-controller/releases/adc/adc-release-notes-3.20/
+
+• Expired Kubernetes kubelet certificate prevents NGINX Controller from starting (25412)
+The Kubernetes kubelet certificate that NGINX Controller applies during installation is valid for one year. If NGINX Controller is not updated for longer than one year, and the kublet certificate expires, Kubernetes will stop or fail to start. When this happens, NGINX Controller fails to start.
+To check the kubernetes certificates, run the following command:
+kubeadm alpha certs check-expiration
+
+Identifying the issue
+• kubectl fails with an error similar to the following:
+The connection to the server <host>:6443 was refused - did you specify the right host or port?
+• In the container logs, such as kubeapi-server, there are error messages similar to the following example:
+441585 1 clientconn.go:1251] grpc: addrConn.createTransport failed to connect to {127.0.0.1:2379 0 <nil>}. Err :connection error: desc = "transport: authentication handshake failed: x509: certificate has expired or is not yet valid". Reconnecting...
+
+Workaround:
+Note: Upgrading NGINX Controller after the kubelet certificate expires will not fix the issue.
+If you find yourself in this situation, you’ll need to take the following steps:
+1. sudo systemctl stop kubelet
+2. sudo kubeadm alpha certs renew all
+3. cd to the home directory of the user who installed NGINX Controller.
+4. mv .kube/config .kube/config.old
+5. sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+6. sudo chown $(id -u):$(id -g) $HOME/.kube/config
+7. sudo chmod 777 $HOME/.kube/config
+8. export KUBECONFIG=.kube/config
+9. sudo shutdown now -r
+When the instance comes back online, you should be at the current date and time via NTP, and the system should function normally.
+In rare cases, if the NGINX Controller host was down when the kubelet certificate expired, you’ll need to take the following additional steps between steps 1 and 2 above:
+1. sudo systemctl stop kubelet
+a. sudo journalctl -xeu kubelet (The output of this command includes the kubelet certificate expiry date/time. Make a note of this value.)
+b. sudo timedatectl set-ntp off
+c. sudo timedatectl set-time "2021-08-16 00:00:00" (Adjust the date and time value to a time that’s one day before the kubelet cert expiry that you noted in step 1a.)
+d. sudo systemctl start kubelet
+e. cd /var/lib/kubelet/pki; ls -l (Monitor this directory to ensure a new PEM file is written, and verify that the symbolic link in the same directory points to the new PEM. Make sure the time matches your time change from step 1c.)
+2. Continue with step 2 in the previous procedure.
