@@ -1,0 +1,48 @@
+UFW logging
+I suspect the customer has some ufw rules which are blocking communication on the K8s overlay network. This would explain the instability of the Controller pods when they have the firewall enabled. I would suggest they turn on ufw logging ( sudo ufw logging on  sudo ufw logging low ) and look for any blocked messages UFW BLOCK in  tail -f /var/log/ufw.log and then add allow rules for those that are being blocked
+
+PCAP on Pod
+How to get tcpdump for containers inside Kubernetes pods (pivotal.io)
+
+admin@00028223ingresscontroller-ubuntu-server1:~$ sudo crictl exec -ti e5f1375d250a6 /bin/bash
+WARN[0000] runtime connect using default endpoints: [unix:///var/run/dockershim.sock nginx@bank-services-ingress-controller-5b9f54cb9b-xds4j:/$ cat /sys/class/net/eth0/iflink
+40
+##
+admin@00028223ingresscontroller-ubuntu-server1:~$ ip link | grep ^40
+40: calib6248ef0ba2@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1480 qdisc noqueue state UP mode DEFAULT group default
+admin@00028223ingresscontroller-ubuntu-server1:~$ sudo tcpdump -i calib6248ef0ba2  port 80 -vvv
+
+PCAP on Pod
+docker build -t tcpdump:latest -<<EOF
+FROM ubuntu
+RUN apt-get update && apt-get install -y tcpdump
+EOF
+tcpdump_sidecar.yaml
+
+
+https://nginx.slack.com/archives/C7Y8U2MLL/p1656927533436909?thread_ts=1656644868.808359&cid=C7Y8U2MLL
+Hi @Zulfadhli NASIR. The NodePorts are managed by kube-proxy, and there are two approaches. One, using a netfilter feature called ipvs which is essentially a load balancer. Two, using iptables and nat as a way to intercept and redirect relevant flows.The iptables approach is the most common. If you list the iptables for the relevant chains, you’ll see the rules that capture and manage the incoming flows. Check out these two commands in any Controller host:
+sudo iptables -t nat -nvL KUBE-NODEPORTS
+sudo iptables -t nat -nvL KUBE-SERVICES
+As for the manual creation of the apigw LoadBalancer service, this is not recommended and should be left to the Controller installation.
+
+Install Kubernetes Cluster on Ubuntu 20.04 with kubeadm _ ComputingForGeeks.pdf
+
+kidd@k8s-master:~$ cat kubeadm-config.yaml
+# kubeadm-config.yaml
+kind: InitConfiguration
+apiVersion: kubeadm.k8s.io/v1beta3
+localAPIEndpoint:
+  advertiseAddress: 10.200.176.16
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+---
+apiVersion: kubeadm.k8s.io/v1beta2
+kubernetesVersion: v1.24.2
+kind: ClusterConfiguration
+---
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: systemd
+failSwapOn: false
