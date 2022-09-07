@@ -20,7 +20,7 @@ EOF
 tcpdump_sidecar.yaml
 
 
-https://nginx.slack.com/archives/C7Y8U2MLL/p1656927533436909?thread_ts=1656644868.808359&cid=C7Y8U2MLL
+https://.com/archives/C7Y8U2MLL/p1656927533436909?thread_ts=1656644868.808359&cid=C7Y8U2MLL
 Hi @Zulfadhli NASIR. The NodePorts are managed by kube-proxy, and there are two approaches. One, using a netfilter feature called ipvs which is essentially a load balancer. Two, using iptables and nat as a way to intercept and redirect relevant flows.The iptables approach is the most common. If you list the iptables for the relevant chains, you’ll see the rules that capture and manage the incoming flows. Check out these two commands in any Controller host:
 sudo iptables -t nat -nvL KUBE-NODEPORTS
 sudo iptables -t nat -nvL KUBE-SERVICES
